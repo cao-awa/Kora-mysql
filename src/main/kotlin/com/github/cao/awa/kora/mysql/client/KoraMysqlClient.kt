@@ -2,9 +2,9 @@ package com.github.cao.awa.kora.mysql.client
 
 import com.github.cao.awa.kora.mysql.client.handshake.HandshakeData
 import com.github.cao.awa.kora.mysql.config.KoraMysqlClientConfig
-import com.github.cao.awa.kora.mysql.data.ColumnDefinition
+import com.github.cao.awa.kora.mysql.data.Column
 import com.github.cao.awa.kora.mysql.data.result.ResultSet
-import com.github.cao.awa.kora.mysql.data.row.RowDefinition
+import com.github.cao.awa.kora.mysql.data.row.Row
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.io.ByteArrayOutputStream
@@ -85,7 +85,7 @@ class KoraMysqlClient(
         this.socket?.close()
     }
 
-    fun execute(sql: String): ResultSet? {
+    fun execute(sql: String): ResultSet {
         this.sequenceId = 0
         val sqlBytes = sql.toByteArray(StandardCharsets.UTF_8)
         val payload = ByteArray(1 + sqlBytes.size)
@@ -95,14 +95,14 @@ class KoraMysqlClient(
         val firstPacket = readPacket()
         return when (firstPacket[0].toInt() and 0xFF) {
             0x00 -> {
-                null
+                ResultSet.EMPTY_RESULT
             }
             0xFF -> throwMysqlError(firstPacket)
             else -> handleResultSet(firstPacket)
         }
     }
 
-    private fun parseColumnDefinition(packet: ByteArray): ColumnDefinition {
+    private fun parseColumnDefinition(packet: ByteArray): Column {
         var pos = 0
         repeat(4) {
             val len = readLenEnc(packet, pos)
@@ -111,7 +111,7 @@ class KoraMysqlClient(
         val nameLength = readLenEnc(packet, pos)
         pos += lengthEncodeSize(packet, pos)
         val name = String(packet, pos, nameLength, StandardCharsets.UTF_8)
-        return ColumnDefinition(name)
+        return Column(name)
     }
 
     private fun readLenEnc(data: ByteArray, offset: Int): Int {
@@ -146,7 +146,7 @@ class KoraMysqlClient(
 
         readPacket()
 
-        val rows = mutableListOf<RowDefinition>()
+        val rows = mutableListOf<List<String?>>()
         while (true) {
             val rowPacket = readPacket()
             val header = rowPacket[0].toInt() and 0xFF
@@ -157,12 +157,28 @@ class KoraMysqlClient(
                 header == 0xFE -> break
                 else -> {
                     val values = parseTextRow(rowPacket)
-                    rows.add(RowDefinition(values))
+                    rows.add(values)
                 }
             }
         }
 
-        return ResultSet(columns, rows)
+        val rowsMap: MutableMap<Column, Row> = mutableMapOf()
+
+        var index = 0
+        for (column in columns) {
+            val row: MutableList<String?> = mutableListOf()
+            for (element in rows) {
+                row.add(element[index])
+            }
+            rowsMap[column] = Row(row)
+            index++
+        }
+
+        if (rows.size > 0) {
+            return ResultSet(columns, rowsMap, rows[0].size)
+        } else {
+            return ResultSet.EMPTY_RESULT
+        }
     }
 
     private fun parseTextRow(packet: ByteArray): List<String?> {
