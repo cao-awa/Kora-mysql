@@ -1,0 +1,4 @@
+{
+    "name": "kora-mysql-client",
+    "entrypoint": "com.github.cao.awa.kora.mysql.entrypoint.MysqlPluginBootstrap#init"
+}
