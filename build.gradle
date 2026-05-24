@@ -1,9 +1,23 @@
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '2.3.20'
+    id 'org.jetbrains.kotlin.jvm' version '2.2.21'
+    id 'java'
+    id 'maven-publish'
 }
 
 group = project.group_id
 version = project.version_name
+
+publishing {
+    publications {
+        gpr(MavenPublication) {
+            groupId = project.group_id
+            artifactId = project.artifact_id
+            version = project.version_name
+
+            from components.java
+        }
+    }
+}
 
 repositories {
     mavenCentral()
@@ -13,13 +27,12 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.cao-awa:Kora:1.0.6'
+    implementation 'com.github.cao-awa:Kora:1.0.7'
 }
 
 kotlin {
-    jvmToolchain(24)
+    jvmToolchain(21)
 }
 
-test {
-    useJUnitPlatform()
-}
+sourceCompatibility = JavaVersion.VERSION_21
+targetCompatibility = JavaVersion.VERSION_21
