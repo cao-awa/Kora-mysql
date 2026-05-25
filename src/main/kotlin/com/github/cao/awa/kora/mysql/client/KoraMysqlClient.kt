@@ -5,6 +5,7 @@ import com.github.cao.awa.kora.mysql.config.KoraMysqlClientConfig
 import com.github.cao.awa.kora.mysql.data.Column
 import com.github.cao.awa.kora.mysql.data.result.ResultSet
 import com.github.cao.awa.kora.mysql.data.row.Row
+import com.github.cao.awa.kora.plugin.registerCleaner
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.io.ByteArrayOutputStream
@@ -53,6 +54,11 @@ class KoraMysqlClient(
             try {
                 INSTANCE.connect()
 
+                registerCleaner("kora-mysql-instance") {
+                    INSTANCE.disconnect()
+                    REAL_INSTANCE = null
+                }
+
                 LOGGER.info("Initialized mysql client, connected to ${config.host()}:${config.port()}")
                 if (config.database() == "") {
                     LOGGER.warn("Mysql database are not set, please execute 'USE database_name' later")
@@ -81,7 +87,7 @@ class KoraMysqlClient(
         handleAuthResult(handshake)
     }
 
-    fun close() {
+    fun disconnect() {
         this.socket?.close()
     }
 
