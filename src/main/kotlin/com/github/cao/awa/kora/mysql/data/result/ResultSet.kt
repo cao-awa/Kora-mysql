@@ -59,13 +59,24 @@ class ResultSet(val columns: List<Column>, val rows: Map<Column, Row>, val lines
         }
     }
 
-    fun getLine(column: Column, name: String): Line {
-        val index = getValues(column).indexOf(name)
-        val line = Line()
-        for (column in this.columns) {
-            line.add(column, getValue(column, index))
+    fun getLine(index: Int): Line {
+        if (index >= this.lines || index < 0){
+            return EmptyLine
+        }
+        val line = Line {
+            for (column in columns) {
+                put(column, getValue(column, index))
+            }
         }
         return line
+    }
+
+    fun getLine(column: Column, name: String): Line {
+        val index = getValues(column).indexOf(name)
+        if (index == -1) {
+            return EmptyLine
+        }
+        return getLine(index)
     }
 
     fun getLine(columnName: String, name: String): Line {
@@ -75,17 +86,6 @@ class ResultSet(val columns: List<Column>, val rows: Map<Column, Row>, val lines
         } else {
             EmptyLine
         }
-    }
-
-    fun getLine(index: Int): Line {
-        if (index >= this.lines){
-            return EmptyLine
-        }
-        val line = Line()
-        for (column in this.columns) {
-            line.add(column, getValue(column, index))
-        }
-        return line
     }
 
     fun size() = this.rows.size

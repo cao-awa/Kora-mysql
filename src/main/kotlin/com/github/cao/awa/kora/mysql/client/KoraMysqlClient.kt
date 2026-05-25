@@ -86,35 +86,38 @@ class KoraMysqlClient(
     }
 
     fun execute(sql: String): ResultSet {
-        this.sequenceId = 0
-        val sqlBytes = sql.toByteArray(StandardCharsets.UTF_8)
-        val payload = ByteArray(1 + sqlBytes.size)
-        payload[0] = 0x03
-        System.arraycopy(sqlBytes, 0, payload, 1, sqlBytes.size)
-        writePacket(payload)
-        val firstPacket = readPacket()
-        return when (firstPacket[0].toInt() and 0xFF) {
-            0x00 -> {
-                ResultSet.EMPTY_RESULT
+        synchronized(this) {
+            this.sequenceId = 0
+            val sqlBytes = sql.toByteArray(StandardCharsets.UTF_8)
+            val payload = ByteArray(1 + sqlBytes.size)
+            payload[0] = 0x03
+            System.arraycopy(sqlBytes, 0, payload, 1, sqlBytes.size)
+            writePacket(payload)
+            val firstPacket = readPacket()
+            return when (firstPacket[0].toInt() and 0xFF) {
+                0x00 -> {
+                    ResultSet.EMPTY_RESULT
+                }
+
+                0xFF -> throwMysqlError(firstPacket)
+                else -> handleResultSet(firstPacket)
             }
-            0xFF -> throwMysqlError(firstPacket)
-            else -> handleResultSet(firstPacket)
         }
     }
 
     private fun parseColumnDefinition(packet: ByteArray): Column {
         var pos = 0
         repeat(4) {
-            val len = readLenEnc(packet, pos)
+            val len = readLengthEncode(packet, pos)
             pos += lengthEncodeSize(packet, pos) + len
         }
-        val nameLength = readLenEnc(packet, pos)
+        val nameLength = readLengthEncode(packet, pos)
         pos += lengthEncodeSize(packet, pos)
         val name = String(packet, pos, nameLength, StandardCharsets.UTF_8)
         return Column(name)
     }
 
-    private fun readLenEnc(data: ByteArray, offset: Int): Int {
+    private fun readLengthEncode(data: ByteArray, offset: Int): Int {
         val first = data[offset].toInt() and 0xFF
         return when {
             first < 0xFB -> first
@@ -191,7 +194,7 @@ class KoraMysqlClient(
                 pos++
                 continue
             }
-            val len = readLenEnc(packet, pos)
+            val len = readLengthEncode(packet, pos)
             pos += lengthEncodeSize(packet, pos)
             val value = String(packet, pos, len, StandardCharsets.UTF_8)
             result.add(value)

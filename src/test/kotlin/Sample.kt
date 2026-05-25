@@ -1,4 +1,5 @@
 import com.github.cao.awa.kora.mysql.client.KoraMysqlClient
+import com.github.cao.awa.kora.mysql.entrypoint.MysqlPluginBootstrap
 
 object Test {
     @JvmStatic
@@ -21,4 +22,9 @@ object Test {
         val specialLine = result.getLine(1)
         println(specialLine)
     }
+}
+
+fun main() {
+    MysqlPluginBootstrap.init()
+    Test.entry()
 }

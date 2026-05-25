@@ -2,11 +2,9 @@ package com.github.cao.awa.kora.mysql.data.line
 
 import com.github.cao.awa.kora.mysql.data.Column
 
-open class Line {
-    private val data: MutableMap<Column, String?> = mutableMapOf()
-
-    open fun add(column: Column, lineData: String?) {
-        this.data[column] = lineData
+open class Line(val creator: MutableMap<Column, String?>.() -> Unit) {
+    private val data: MutableMap<Column, String?> = mutableMapOf<Column, String?>().also {
+        this.creator(it)
     }
 
     override fun toString(): String {
