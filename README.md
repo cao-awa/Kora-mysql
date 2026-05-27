@@ -49,7 +49,7 @@ In produce environment, you need put the ``kora-mysql`` jar to ``libs/`` directo
 ```json
 {
     "entrypoint": [
-        "kora-mysql",
+        "kora-mysql-client",
         "com.yourservice.xxx.ServiceEntrypoint#entry"
     ]
 }
