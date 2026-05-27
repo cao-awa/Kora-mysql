@@ -6,11 +6,13 @@ import com.github.cao.awa.kora.mysql.data.Column
 import com.github.cao.awa.kora.mysql.data.result.ResultSet
 import com.github.cao.awa.kora.mysql.data.row.Row
 import com.github.cao.awa.kora.plugin.registerCleaner
+import com.github.cao.awa.kora.status.KoraStatus
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.ConnectException
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -19,6 +21,7 @@ import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
+import java.util.Random
 import javax.crypto.Cipher
 
 class KoraMysqlClient(
@@ -41,6 +44,7 @@ class KoraMysqlClient(
         private const val CLIENT_PLUGIN_AUTH = 0x00080000
         private const val CLIENT_CONNECT_ATTRS = 0x00100000
         private const val CLIENT_DEPRECATE_EOF = 0x01000000
+        private lateinit var daemonThread: Thread
 
         fun init(config: KoraMysqlClientConfig) {
             REAL_INSTANCE = KoraMysqlClient(
@@ -54,25 +58,67 @@ class KoraMysqlClient(
             try {
                 INSTANCE.connect()
 
-                registerCleaner("kora-mysql-instance") {
-                    INSTANCE.disconnect()
-                    REAL_INSTANCE = null
+                KoraStatus.registerLifecycle("Kora-mysql", INSTANCE)
+
+                KoraStatus.registerReloadListener {
+                    INSTANCE.close()
+                    this.daemonThread.interrupt()
+                    KoraStatus.completedLifecycle(INSTANCE)
                 }
 
-                LOGGER.info("Initialized mysql client, connected to ${config.host()}:${config.port()}")
+                KoraStatus.registerStopListener {
+                    INSTANCE.close()
+                    this.daemonThread.interrupt()
+                    KoraStatus.completedLifecycle(INSTANCE)
+                }
+
+                registerCleaner("kora-mysql-instance") {
+                    REAL_INSTANCE = null
+                    LOGGER.info("Kora MySql lifecycle ending")
+                }
+
+                val random = Random()
+                this.daemonThread = Thread.startVirtualThread {
+                    try {
+                        while (INSTANCE.isRunning) {
+                            Thread.sleep(1000)
+                            try {
+                               INSTANCE.execute("SELECT 1;")
+                            } catch (e: Exception) {
+                                LOGGER.warn("MySql server closed")
+                                INSTANCE.close()
+                                while (!INSTANCE.isRunning) {
+                                    Thread.sleep(config.reconnectTime().toLong())
+                                    LOGGER.info("Trying to reconnect to MySql server")
+                                    try {
+                                        INSTANCE.connect()
+                                        LOGGER.info("Connected to MySql server on ${config.host()}:${config.port()}")
+                                    } catch (e: ConnectException) {
+                                        LOGGER.warn("Failed to reconnect to MySql server, try again after {} ms", config.reconnectTime())
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: InterruptedException) {
+                        LOGGER.info("Kora MySql client daemon thread exited")
+                    }
+                }
+
+                LOGGER.info("Initialized MySql client, connected to ${config.host()}:${config.port()}")
                 if (config.database() == "") {
                     LOGGER.warn("Mysql database are not set, please execute 'USE database_name' later")
                 }
             } catch (e: Exception) {
-                throw IllegalStateException("Cannot initialize mysql client", e)
+                throw IllegalStateException("Cannot initialize MySql client", e)
             }
         }
     }
 
-    private var socket: Socket? = null
-    private var input: InputStream? = null
-    private var output: OutputStream? = null
+    private lateinit var socket: Socket
+    private lateinit var input: InputStream
+    private lateinit var output: OutputStream
     private var sequenceId = 0
+    private var isRunning = false
 
     fun connect() {
         val socket = Socket(this.host, this.port)
@@ -85,10 +131,13 @@ class KoraMysqlClient(
         val handshake = parseHandshake(handshakePacket)
         sendHandshakeResponse(handshake)
         handleAuthResult(handshake)
+        this.isRunning = true
     }
 
-    fun disconnect() {
-        this.socket?.close()
+    fun close() {
+        this.socket.close()
+        this.output.close()
+        this.input.close()
     }
 
     fun execute(sql: String): ResultSet {

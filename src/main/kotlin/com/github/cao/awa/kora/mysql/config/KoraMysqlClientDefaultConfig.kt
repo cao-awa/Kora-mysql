@@ -24,4 +24,8 @@ object KoraMysqlClientDefaultConfig: KoraMysqlClientConfig() {
     override fun database(database: String): KoraMysqlClientConfig {
         throwWhenSet()
     }
+
+    override fun reconnectTime(reconnectTime: Int): KoraMysqlClientConfig {
+        throwWhenSet()
+    }
 }

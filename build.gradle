@@ -27,7 +27,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.cao-awa:Kora:1.0.10'
+    implementation 'com.github.cao-awa:Kora:1.0.13'
 }
 
 kotlin {

@@ -30,6 +30,10 @@ open class KoraMysqlClientConfig : KoraConfig() {
                     config.database = this
                 }
 
+                ifInt("reconnect_time") {
+                    config.reconnectTime = this
+                }
+
                 config
             }
         }
@@ -40,6 +44,7 @@ open class KoraMysqlClientConfig : KoraConfig() {
     private var username: String = "root"
     private var password: String = ""
     private var database: String = ""
+    private var reconnectTime: Int = 5000
 
     fun host(): String {
         return this.host
@@ -86,6 +91,15 @@ open class KoraMysqlClientConfig : KoraConfig() {
         return this
     }
 
+    fun reconnectTime(): Int {
+        return this.reconnectTime
+    }
+
+    open fun reconnectTime(reconnectTime: Int): KoraMysqlClientConfig {
+        this.reconnectTime = reconnectTime
+        return this
+    }
+
     override fun toJSON(): JSONObject {
         return JSONObject {
             "host" set host
@@ -93,6 +107,7 @@ open class KoraMysqlClientConfig : KoraConfig() {
             "username" set username
             "password" set password
             "database" set database
+            "reconnect_time" set reconnectTime
         }
     }
 }
