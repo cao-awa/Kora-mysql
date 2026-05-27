@@ -93,7 +93,7 @@ class KoraMysqlClient(
                                     try {
                                         INSTANCE.connect()
                                         LOGGER.info("Connected to MySql server on ${config.host()}:${config.port()}")
-                                    } catch (e: ConnectException) {
+                                    } catch (e: Exception) {
                                         LOGGER.warn("Failed to reconnect to MySql server, try again after {} ms", config.reconnectTime())
                                     }
                                 }
@@ -138,6 +138,7 @@ class KoraMysqlClient(
         this.socket.close()
         this.output.close()
         this.input.close()
+        this.isRunning = false
     }
 
     fun execute(sql: String): ResultSet {
